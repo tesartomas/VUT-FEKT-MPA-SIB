@@ -1,0 +1,80 @@
+! --------------
+! | BGP Vortex |
+! --------------
+! AS 65001 Peer provider
+!
+! GNS3 node configuration:
+! g0/0: AS 65002 g0/1
+! g0/1: AS 65003 g0/0
+! g0/2: AS 65010 g0/0
+! g0/3: presentation kali eth1
+!
+hostname AS65001
+
+! Interface configuration
+int g0/0
+    ip address 10.1.2.1 255.255.255.252
+    description Peer 65002
+    no sh
+int g0/1
+    ip address 10.3.1.2 255.255.255.252
+    description Peer 65003
+    no sh
+int g0/2
+    ip address 10.1.10.1 255.255.255.252
+    description Customer 65010
+    no sh
+int g0/3
+    ip address 172.16.1.1 255.255.255.0
+    description Internal network
+    no sh
+
+! Gao-Rexford community
+ip community-list standard FROM-PEER permit 65000:0
+! BGP Vortex communities
+ip community-list standard AS10-LOWER-PREF permit 65000:50
+ip community-list standard AS10-BLOCK-TO-65003 permit 65000:65003
+
+! Enforce Gao-Rexford propagation
+route-map FROM-65002 permit 10
+    set community 65000:0 additive
+
+! Enforce Gao-Rexford propagation
+route-map TO-65002 deny 10
+    match community FROM-PEER
+route-map TO-65002 permit 20
+
+! Enforce Gao-Rexford propagation
+route-map FROM-65003 permit 10
+    set community 65000:0 additive
+
+! Enforce Gao-Rexford propagation
+route-map TO-65003 deny 10
+    match community FROM-PEER
+! BGP Vortex: NOPEER
+route-map TO-65003 deny 20
+    match community AS10-BLOCK-TO-65003
+route-map TO-65003 permit 30
+
+! BGP Vortex: LOWER-PREF
+route-map FROM-65010 permit 10
+    match community AS10-LOWER-PREF
+    set local-preference 50
+route-map FROM-65010 permit 20
+
+! BGP Router configuration
+router bgp 65001
+    bgp router-id 10.1.0.0
+    network 10.1.2.0 mask 255.255.255.252
+    network 10.1.10.0 mask 255.255.255.252
+    network 172.16.1.0 mask 255.255.255.0
+    neighbor 10.1.2.2 remote-as 65002
+    neighbor 10.1.2.2 route-map FROM-65002 in
+    neighbor 10.1.2.2 route-map TO-65002 out
+    neighbor 10.3.1.1 remote-as 65003
+    neighbor 10.3.1.1 route-map FROM-65003 in
+    neighbor 10.3.1.1 route-map TO-65003 out
+    neighbor 10.1.10.2 remote-as 65010
+    neighbor 10.1.10.2 send-community
+    neighbor 10.1.10.2 route-map FROM-65010 in    
+end
